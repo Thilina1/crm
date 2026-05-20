@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userExists() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isStaff() {
+      return userExists() && userDoc().data.role in ['admin', 'rep'];
+    }
+
+    function isAdmin() {
+      return userExists() && userDoc().data.role == 'admin';
+    }
+
+    // Returns true when the signed-in user is in the project's memberUids array
+    function isProjectMember(projectId) {
+      return isSignedIn() &&
+        request.auth.uid in
+          get(/databases/$(database)/documents/projects/$(projectId)).data.memberUids;
+    }
+
+    match /users/{userId} {
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow read, update: if isSignedIn() && (request.auth.uid == userId || isStaff());
+      allow delete: if isAdmin();
+    }
+
+    match /leads/{leadId} {
+      allow read, write: if isStaff();
+      match /activities/{actId} { allow read, write: if isStaff(); }
+    }
+
+    match /accounts/{accountId} {
+      allow read, write: if isStaff();
+      match /contacts/{contactId} { allow read, write: if isStaff(); }
+      match /activities/{actId} { allow read, write: if isStaff(); }
+    }
+
+    match /contacts/{contactId} { allow read, write: if isStaff(); }
+
+    match /opportunities/{oppId} {
+      allow read, write: if isStaff();
+      match /activities/{actId} { allow read, write: if isStaff(); }
+    }
+
+    match /projects/{projectId} {
+      allow read, write: if isStaff();
+      // Project members (customers) can read projects they are assigned to
+      allow read: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+
+      match /events/{eventId} {
+        allow read, write: if isStaff();
+        allow read: if isProjectMember(projectId);
+      }
+      match /invoices/{invoiceId} {
+        allow read, write: if isStaff();
+        allow read: if isProjectMember(projectId);
+        match /payments/{paymentId} {
+          allow read, write: if isStaff();
+          allow read: if isProjectMember(projectId);
+        }
+      }
+      match /documents/{docId} { allow read, write: if isStaff(); }
+      match /activities/{actId} { allow read, write: if isStaff(); }
+    }
+
+    match /tickets/{ticketId} {
+      allow read, write: if isStaff();
+      match /comments/{commentId} { allow read, write: if isStaff(); }
+      match /attachments/{attachId} { allow read, write: if isStaff(); }
+    }
+
+    match /cases/{caseId} {
+      allow read, write: if isStaff();
+      match /notes/{noteId} { allow read, write: if isStaff(); }
+    }
+
+    match /documents/{docId} { allow read, write: if isStaff(); }
+
+    match /stageTemplates/{templateId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+  }
+}
