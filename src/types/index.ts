@@ -161,14 +161,14 @@ export type TicketSource = "portal" | "call" | "internal";
 export interface Ticket {
   id: string;
   accountId: string;
-  projectId: string;
+  projectId?: string;
   title: string;
   description: string;
   priority: TicketPriority;
   status: TicketStatus;
   source: TicketSource;
   assignedRep: string;
-  dueDate: Timestamp;
+  dueDate?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

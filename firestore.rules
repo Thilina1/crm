@@ -22,7 +22,6 @@ service cloud.firestore {
       return userExists() && userDoc().data.role == 'admin';
     }
 
-    // Returns true when the signed-in user is in the project's memberUids array
     function isProjectMember(projectId) {
       return isSignedIn() &&
         request.auth.uid in
@@ -55,7 +54,6 @@ service cloud.firestore {
 
     match /projects/{projectId} {
       allow read, write: if isStaff();
-      // Project members (customers) can read projects they are assigned to
       allow read: if isSignedIn() && request.auth.uid in resource.data.memberUids;
 
       match /events/{eventId} {
@@ -76,7 +74,29 @@ service cloud.firestore {
 
     match /tickets/{ticketId} {
       allow read, write: if isStaff();
-      match /comments/{commentId} { allow read, write: if isStaff(); }
+      // Project members can read and create tickets linked to their project
+      allow read: if isSignedIn()
+        && resource.data.projectId != null
+        && request.auth.uid in
+             get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.memberUids;
+      allow create: if isSignedIn()
+        && request.resource.data.projectId != null
+        && request.auth.uid in
+             get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.memberUids;
+
+      match /comments/{commentId} {
+        allow read, write: if isStaff();
+        // Project members can read and post non-internal comments on their tickets
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/tickets/$(ticketId)).data.projectId != null
+          && request.auth.uid in
+               get(/databases/$(database)/documents/projects/$(get(/databases/$(database)/documents/tickets/$(ticketId)).data.projectId)).data.memberUids;
+        allow create: if isSignedIn()
+          && !request.resource.data.isInternal
+          && get(/databases/$(database)/documents/tickets/$(ticketId)).data.projectId != null
+          && request.auth.uid in
+               get(/databases/$(database)/documents/projects/$(get(/databases/$(database)/documents/tickets/$(ticketId)).data.projectId)).data.memberUids;
+      }
       match /attachments/{attachId} { allow read, write: if isStaff(); }
     }
 

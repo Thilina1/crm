@@ -18,12 +18,13 @@ import {
   getPayments,
   recordPayment,
   getLead,
+  getTicketsByProject,
 } from "@/lib/firestore";
 import { createUserWithEmailAndPassword, updateProfile, signOut } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { provisionAuth, provisionDb } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Project, ProjectEvent, AppUser, Invoice, Payment, InvoiceStatus, PaymentMethod } from "@/types";
+import type { Project, ProjectEvent, AppUser, Invoice, Payment, InvoiceStatus, PaymentMethod, Ticket, TicketStatus, TicketPriority } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -676,6 +677,9 @@ export default function ProjectDetailPage() {
       {/* Billing */}
       <BillingSection projectId={id} isCustomer={isCustomer} budget={budget} />
 
+      {/* Tickets */}
+      <TicketsSection projectId={id} accountId={project.accountId} />
+
       {/* Documents placeholder */}
       <div className="bg-white rounded-xl border border-dashed border-slate-200 p-6 text-center space-y-2">
         <p className="text-sm font-medium text-slate-500">Documents</p>
@@ -1057,6 +1061,115 @@ function BillingSection({ projectId, isCustomer, budget }: { projectId: string; 
               );
             })}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tickets section ──────────────────────────────────────────────────────────
+
+const priorityPill: Record<TicketPriority, string> = {
+  urgent: "bg-red-50 text-red-600 border border-red-100",
+  high:   "bg-amber-50 text-amber-600 border border-amber-100",
+  medium: "bg-blue-50 text-blue-600 border border-blue-100",
+  low:    "bg-slate-100 text-slate-500 border border-slate-200",
+};
+
+const statusPill: Record<TicketStatus, string> = {
+  open:              "bg-blue-50 text-blue-600 border border-blue-100",
+  in_progress:       "bg-violet-50 text-violet-600 border border-violet-100",
+  awaiting_customer: "bg-amber-50 text-amber-600 border border-amber-100",
+  resolved:          "bg-green-50 text-green-600 border border-green-100",
+  closed:            "bg-slate-100 text-slate-500 border border-slate-200",
+};
+
+const statusLabel: Record<TicketStatus, string> = {
+  open:              "Open",
+  in_progress:       "In Progress",
+  awaiting_customer: "Awaiting",
+  resolved:          "Resolved",
+  closed:            "Closed",
+};
+
+function TicketsSection({
+  projectId,
+  accountId,
+}: {
+  projectId: string;
+  accountId: string;
+}) {
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getTicketsByProject(projectId)
+      .then(setTickets)
+      .finally(() => setLoading(false));
+  }, [projectId]);
+
+  const open       = tickets.filter((t) => t.status === "open").length;
+  const inProgress = tickets.filter((t) => t.status === "in_progress").length;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-700">Support Tickets</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {tickets.length} total · {open} open · {inProgress} in progress
+          </p>
+        </div>
+        <a
+          href={`/dashboard/tickets/new?projectId=${projectId}&accountId=${accountId}`}
+          className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+        >
+          <Plus className="w-4 h-4" /> New ticket
+        </a>
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {loading ? (
+          <div className="p-5 space-y-2">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="h-12 bg-slate-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : tickets.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-8">
+            No tickets yet —{" "}
+            <a
+              href={`/dashboard/tickets/new?projectId=${projectId}&accountId=${accountId}`}
+              className="text-blue-600 hover:underline"
+            >
+              create the first one
+            </a>
+          </p>
+        ) : (
+          tickets.map((t) => (
+            <a
+              key={t.id}
+              href={`/dashboard/tickets/${t.id}`}
+              className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors group"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                  {t.title}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                  TKT-{t.id.slice(0, 6).toUpperCase()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${priorityPill[t.priority]}`}>
+                  {t.priority}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusPill[t.status]}`}>
+                  {statusLabel[t.status]}
+                </span>
+              </div>
+            </a>
+          ))
         )}
       </div>
     </div>

@@ -468,3 +468,45 @@ export async function recordPayment(
     updatedAt: serverTimestamp(),
   });
 }
+
+// ─── Tickets ──────────────────────────────────────────────────────────────────
+
+import type { Ticket, TicketComment } from "@/types";
+
+export async function createTicket(data: Omit<Ticket, "id" | "createdAt" | "updatedAt">): Promise<string> {
+  const ref = await addDoc(ticketsCol(), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  return ref.id;
+}
+
+export async function getTickets(): Promise<Ticket[]> {
+  const snap = await getDocs(query(ticketsCol(), orderBy("createdAt", "desc")));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Ticket));
+}
+
+export async function getTicketsByProject(projectId: string): Promise<Ticket[]> {
+  const snap = await getDocs(query(ticketsCol(), where("projectId", "==", projectId)));
+  const tickets = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Ticket));
+  return tickets.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+}
+
+export async function getTicket(id: string): Promise<Ticket | null> {
+  const snap = await getDoc(doc(db, "tickets", id));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as Ticket;
+}
+
+export async function updateTicket(id: string, data: Partial<Ticket>): Promise<void> {
+  await updateDoc(doc(db, "tickets", id), { ...data, updatedAt: serverTimestamp() });
+}
+
+export async function createTicketComment(ticketId: string, data: Omit<TicketComment, "id" | "ticketId" | "createdAt">): Promise<string> {
+  const col = collection(db, "tickets", ticketId, "comments");
+  const ref = await addDoc(col, { ...data, ticketId, createdAt: serverTimestamp() });
+  return ref.id;
+}
+
+export async function getTicketComments(ticketId: string): Promise<TicketComment[]> {
+  const col = collection(db, "tickets", ticketId, "comments");
+  const snap = await getDocs(query(col, orderBy("createdAt", "asc")));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as TicketComment));
+}

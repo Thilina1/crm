@@ -33,7 +33,7 @@ const SOURCES: { value: LeadSource; label: string; icon: string }[] = [
 
 const PRODUCTS = [
   "Solar installation", "Service contract", "Consultation",
-  "Maintenance plan", "Other",
+  "Maintenance plan", "Software", "Marketing", "Real Estate", "Other",
 ];
 
 const scorePill: Record<string, string> = {

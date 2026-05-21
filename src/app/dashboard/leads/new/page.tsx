@@ -34,6 +34,9 @@ const PRODUCTS = [
   "Service contract",
   "Consultation",
   "Maintenance plan",
+  "Software",
+  "Marketing",
+  "Real Estate",
   "Other",
 ];
 
